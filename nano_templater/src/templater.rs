@@ -1,8 +1,12 @@
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
+use config::Config;
 use itertools::Itertools;
 use parser_iter::*;
 
+use crate::templater::config::UnmachedAction;
+
+pub mod config;
 mod parser_iter;
 
 /// The structure for templating
@@ -15,9 +19,9 @@ mod parser_iter;
 ///
 /// ```
 /// use nano_templater::Templater;
-/// use std::collection::HashMap;
+/// use std::collections::HashMap;
 /// let template = "Hello, {name}!";
-/// let templater = Templater::prepare(&template);
+/// let templater = Templater::prepare(&template, Default::default());
 /// let mut map = HashMap::new();
 /// map.insert("name".to_string(), "Foxie");
 /// let hello_foxie = templater.format(&map).unwrap();
@@ -30,6 +34,8 @@ pub struct Templater<'a> {
     /// Names of variables in the order they come
     /// Names can repeat
     keywords: Vec<&'a str>,
+    /// Config
+    config: Config,
 }
 
 /// The main parsing login is being stored in the iterator implementation
@@ -56,14 +62,12 @@ impl<'r, 'a> From<TParserIter<'r, 'a>> for Templater<'a> {
             }
         }
 
-        Self { parts, keywords }
+        Self {
+            parts,
+            keywords,
+            config: Default::default(),
+        }
     }
-}
-
-/// A hack to rule them all
-enum S<'a> {
-    SR(&'a str),
-    S(String),
 }
 
 /// Public logic is stored here
@@ -78,9 +82,11 @@ impl<'a> Templater<'a> {
     /// And everything not matchig is just a simple text
     /// # Example
     /// Hello, {world}
-    pub fn prepare(data: &'a str) -> Self {
-        let mut re = None;
-        TParserIter::parse(&mut re, data).into()
+    pub fn prepare(data: &'a str, config: Config) -> Self {
+        Self {
+            config,
+            ..TParserIter::parse(data).into()
+        }
     }
 
     /// This function substitutes variables with the actual values
@@ -90,23 +96,24 @@ impl<'a> Templater<'a> {
     where
         T: std::string::ToString,
     {
-        let templated = self
-            .keywords
+        let templated = self.keywords.iter().map(|key| {
+            dictionary.get(*key).map_or(
+                match self.config.unmached_keywords {
+                    UnmachedAction::Ignore => Some(Cow::Borrowed("")),
+                    UnmachedAction::SubsWithKeywordName => Some(Cow::Borrowed(*key)),
+                    UnmachedAction::ResultInNone => None,
+                },
+                |v| Some(Cow::Owned(v.to_string())),
+            )
+        });
+
+        let interleaved = self
+            .parts
             .iter()
-            .map(|key| dictionary.get(*key).map(|t| S::S(t.to_string())))
-            .collect::<Option<Vec<S>>>()?;
+            .map(|&s| Some(Cow::Borrowed(s)))
+            .interleave(templated)
+            .collect::<Option<String>>()?;
 
-        let interleaved = self.parts.iter().map(|sr| S::SR(sr)).interleave(templated);
-
-        let mut result = String::new();
-
-        for part in interleaved {
-            match part {
-                S::SR(sr) => result.push_str(sr),
-                S::S(s) => result.push_str(&s),
-            }
-        }
-
-        Some(result)
+        Some(interleaved)
     }
 }

@@ -1,4 +1,8 @@
+use std::sync::LazyLock;
+
 use regex::{CaptureMatches, Regex};
+
+static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"\{\s*([a-zA-Z0-9_]+)\s*\}"#).unwrap());
 
 pub(super) struct TParserIter<'r, 'a> {
     data: &'a str,
@@ -16,10 +20,8 @@ pub(super) enum ParseToken<'a> {
 }
 
 impl<'r, 'a> TParserIter<'r, 'a> {
-    pub(super) fn parse(re: &'r mut Option<Regex>, data: &'a str) -> Self {
-        *re = Some(Regex::new(r#"\{\s*([a-zA-Z0-9_]+)\s*\}"#).unwrap());
-        let r = re.as_ref().unwrap();
-        let captures = r.captures_iter(data);
+    pub(super) fn parse(data: &'a str) -> Self {
+        let captures = RE.captures_iter(data);
         Self {
             data: data,
             matches: captures,

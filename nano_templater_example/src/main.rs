@@ -4,7 +4,7 @@ use nano_templater::templater::Templater;
 
 fn main() {
     let template = "Hello, {name}!";
-    let templater = Templater::prepare(&template);
+    let templater = Templater::prepare(&template, Default::default());
     let mut map = HashMap::new();
     map.insert("name".to_string(), "Foxie");
     let hello_foxie = templater.format(&map).unwrap();

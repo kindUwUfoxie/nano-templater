@@ -23,9 +23,9 @@ mod parser_iter;
 /// let template = "Hello, {name}!";
 /// let templater = Templater::prepare(&template, Default::default());
 /// let mut map = HashMap::new();
-/// map.insert("name".to_string(), "Foxie");
+/// map.insert("name", "Foxie");
 /// let hello_foxie = templater.format(&map).unwrap();
-/// map.insert("name".to_string(), "World");
+/// map.insert("name", "World");
 /// let hello_world = templater.format(&map).unwrap();
 /// ```
 pub struct Templater<'a> {
@@ -92,12 +92,12 @@ impl<'a> Templater<'a> {
     /// This function substitutes variables with the actual values
     /// I am not sure if it is really efficent
     /// But it is as it is
-    pub fn format<T>(&self, dictionary: &HashMap<String, T>) -> Option<String>
+    pub fn format<T>(&self, dictionary: &HashMap<&str, T>) -> Option<String>
     where
         T: std::string::ToString,
     {
         let templated = self.keywords.iter().map(|key| {
-            dictionary.get(*key).map_or(
+            dictionary.get(key).map_or(
                 match self.config.unmached_keywords {
                     UnmachedAction::Ignore => Some(Cow::Borrowed("")),
                     UnmachedAction::SubsWithKeywordName => Some(Cow::Borrowed(*key)),

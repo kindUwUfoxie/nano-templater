@@ -4,11 +4,10 @@ use regex::{CaptureMatches, Regex};
 
 static RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"\{\s*([a-zA-Z0-9_]+)\s*\}"#).unwrap());
 
-pub(super) struct TParserIter<'r, 'a> {
+pub(super) struct TParserIter<'a> {
     data: &'a str,
-    matches: CaptureMatches<'r, 'a>,
+    matches: CaptureMatches<'static, 'a>,
     last: usize,
-    finished: bool,
 }
 
 pub(super) enum ParseToken<'a> {
@@ -19,40 +18,38 @@ pub(super) enum ParseToken<'a> {
     LastPart(&'a str),
 }
 
-impl<'r, 'a> TParserIter<'r, 'a> {
+impl<'a> TParserIter<'a> {
     pub(super) fn parse(data: &'a str) -> Self {
         let captures = RE.captures_iter(data);
         Self {
-            data: data,
+            data,
             matches: captures,
             last: 0,
-            finished: false,
         }
     }
 }
 
-impl<'r, 'a> Iterator for TParserIter<'r, 'a> {
+impl<'a> Iterator for TParserIter<'a> {
     type Item = ParseToken<'a>;
     fn next(&mut self) -> Option<Self::Item> {
-        if self.finished {
-            None
-        } else {
-            if let Some(m) = self.matches.next() {
-                let (Some(place), Some(kw)) = (m.get(0), m.get(1)) else {
-                    panic!("Could not compile the template");
-                };
+        if let Some(m) = self.matches.next() {
+            let place = m.get(0).expect("Unreachable: match could no have no match");
+            let kw = m
+                .get(1)
+                .expect("Unreachable: match must have the group matched");
 
-                let item = &self.data[self.last..place.start()];
-                self.last = place.end();
-                Some(ParseToken::Pair {
-                    before_part: item,
-                    keyword: kw.as_str(),
-                })
-            } else {
-                self.finished = true;
-                let item = &self.data[self.last..];
-                Some(ParseToken::LastPart(item))
-            }
+            let item = &self.data[self.last..place.start()];
+            self.last = place.end();
+            Some(ParseToken::Pair {
+                before_part: item,
+                keyword: kw.as_str(),
+            })
+        } else if self.last < self.data.len() {
+            let item = &self.data[self.last..];
+            self.last = self.data.len();
+            Some(ParseToken::LastPart(item))
+        } else {
+            None
         }
     }
 }

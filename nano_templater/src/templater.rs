@@ -109,10 +109,9 @@ impl<'a> Templater<'a> {
         self.parts
             .iter()
             .copied()
-            .map(String::from)
-            .interleave(keyword_values.into_iter())
+            .interleave(keyword_values.iter().map(String::as_str))
             .fold(String::with_capacity(total_size), |mut acc, item| {
-                acc.push_str(item.as_str());
+                acc.push_str(item);
                 acc
             })
             .into()

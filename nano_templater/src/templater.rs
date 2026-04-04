@@ -102,7 +102,7 @@ impl<'a> Templater<'a> {
 
         let total_size = keyword_values
             .iter()
-            .map(|v| v.len())
+            .map(String::len)
             .chain(self.parts.iter().map(|p| p.len()))
             .sum::<usize>();
 
